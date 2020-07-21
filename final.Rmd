@@ -3,10 +3,22 @@ title: "epiFi Assignment"
 author: "Sahil Maheshwari"
 date: "`r Sys.Date()`"
 output:
-  html_document: default
+  html_document: 
+    df_print: paged
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
   html_notebook:
     df_print: paged
     code_folding: "hide"
+    theme: united
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
 editor_options:
   chunk_output_type: inline
 ---
@@ -40,7 +52,7 @@ load("data_intermediate/data_cleaning_1_output.RData")
 
 ## Missingness
 ```{r}
-count_na(data_mix)
+sapply(data_mix, function(x) sum(is.na(x)))
 ```
 
 So, no missing data. Yayyy!
@@ -55,7 +67,7 @@ Credit worthiness for a group of observations can be measured by Good/Total prop
 
 Again, let's first define what critical means. In the absence of any concrete definition, I will assume 'critical' roughly means more existing credits i.e. it increase from A30 to A35
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cat(data_mix, "credit_history", "is_credit_worthy", "Good", "Bad")
 
 ggplotly(
@@ -68,7 +80,7 @@ ggplotly(
 ## Age
 > Q. Are young people more creditworthy?  
 
-```{r}
+```{r, message=FALSE}
 plot_list <- plot_target_cat_feature_cont(data_mix, "age", "is_credit_worthy")
 
 ggplotly(
@@ -85,7 +97,7 @@ But let's break the age into groups to see finer details
 data_mix$age_groups <- cut(data_mix$age, breaks = c(18, 24, 29, 34, 39, 49, 64, Inf), ordered_result = T)
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cat(data_mix, "age_groups", "is_credit_worthy", "Good", "Bad")
 
 ggplotly(
@@ -104,7 +116,7 @@ I am assuming more credit accounts is same as "Number of existing credits at thi
 plot_list <- plot_target_cat_feature_cat(data_mix, "count_existing_credits", "is_credit_worthy", "Good", "Bad")
 ```
 
-```{r}
+```{r, message=FALSE}
 ggplotly(
   plot_list[[1]]
 )
@@ -120,9 +132,9 @@ ggplotly(
 > Data is too unreliable to say anything on the relationship between no. of credit accounts and credit worthiness
 
 # Feature Engineering & Selection  
-Consequently, there is no feature engineering.  
+As mentioned earlier I didn't do any EDA from featre engineering perspective. So, there is no feature engineering.  
 
-For feature engineering I have used Boruta, which I have found to be the best feature selection technique almost always. Below is how the Boruta plot looks like:
+For feature selection I have used Boruta, which I have found to be the best feature selection technique almost always. Below is how the Boruta plot looks like:
 ```{r}
 load("models/boruta_train_obj.RData")
 
@@ -146,7 +158,8 @@ colnames(data_after_fs)
 ## Strategy
 > It is worse to class a customer as 'Good' when they are 'Bad', than it is to class a customer as bad when they are good.  
 
-Let 'Good' be the positive class, and 'Bad' be the negative class. So the above statement will translate to:  
+Let 'Good' be the positive class, and 'Bad' be the negative class. So the above statement will translate to:   
+
 > False Positives (FPs) are more expensive than False Negatives (FNs) 
 
 Such cases fall under **Cost Sensitive Learning" strategy, and followong sub-strategies can be followed decided under it:
@@ -335,11 +348,17 @@ model_comparison_df
 It may seem like that GBM is a better model, but we still haven't seen the uncertainity (variance) in the results. Difference between train and test set results give some idea about it, but its better to see it on cross-validated results.
 
 ```{r}
-model_gbm_best
+temp <- model_gbm_best@model$cross_validation_metrics_summary
+temp_1 <- tibble(metrics = row.names(temp)) %>% 
+  bind_cols(temp %>% as_tibble())
+datatable(temp_1[,1:3], rownames = FALSE, filter="none", options = list(scrollX=T, scrollY="200px", scrollCollapse=FALSE, paging=FALSE))
 ```
 
 ```{r}
-model_drf_best
+temp <- model_drf_best@model$cross_validation_metrics_summary
+temp_1 <- data.frame(metrics = row.names(temp)) %>% 
+  bind_cols(temp %>% as_tibble())
+datatable(temp_1[,1:3], rownames = FALSE, filter="none", options = list(scrollX=T, scrollY="200px", scrollCollapse=FALSE, paging=FALSE))
 ```
 
 Not much difference here too, DRF seems only slightly better but that may change with fold assignment. For GBM, I did positive class upsample tuning but didn't tune other hyperparameters. And for DRF I did the exact opposite. So, both the models have a lot of scope of tuning, and I am not at a stage to pick the right model
@@ -357,7 +376,7 @@ h2o.varimp_plot(model_drf_best)
 To profile a 'Good' credit worthy person as per the model, let's explore the relationship of top predictors with the predicted class for the DRF model.
 
 
-```{r}
+```{r, include=FALSE}
 train_pred_df_drf_default <- get_prediction(model_drf_best, train_h2o)
 train_pred_df_drf_opt <- get_prediction_class_given_threshold(train_pred_df_drf_default, opt_threshold_drf$minimum)
 
@@ -367,7 +386,7 @@ test_pred_df_drf_opt <- get_prediction_class_given_threshold(test_pred_df_drf_de
 all_pred_df_drf_opt <- bind_rows(train_pred_df_drf_opt, test_pred_df_drf_opt)
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cat(all_pred_df_drf_opt, "checking_account_status", "is_credit_worthy_pred_class", "Good", "Bad")
 
 ggplotly(
@@ -375,7 +394,7 @@ ggplotly(
 )
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cont(all_pred_df_drf_opt, "duration_in_months", "is_credit_worthy_pred_class")
 
 ggplotly(
@@ -383,7 +402,7 @@ ggplotly(
 )
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cont(all_pred_df_drf_opt, "credit_amount", "is_credit_worthy_pred_class")
 
 ggplotly(
@@ -391,7 +410,7 @@ ggplotly(
 )
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cat(all_pred_df_drf_opt, "credit_history", "is_credit_worthy_pred_class", "Good", "Bad")
 
 ggplotly(
@@ -399,7 +418,7 @@ ggplotly(
 )
 ```
 
-```{r}
+```{r, message=FALSE}
 plot_list = plot_target_cat_feature_cat(all_pred_df_drf_opt, "purpose", "is_credit_worthy_pred_class", "Good", "Bad")
 
 ggplotly(
