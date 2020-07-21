@@ -4,7 +4,6 @@ source("utils.R")
 message("--------------------------")
 message("Starting execution...")
 
-h2o.shutdown(prompt = F)
 h2o.init()
 
 load("data_intermediate/splitted_data.RData")
@@ -33,7 +32,7 @@ drf_grid <- h2o.grid(
   algorithm = "randomForest",
   x = x,
   y = y,
-  grid_id = "drf_grid_11",
+  grid_id = "drf_grid_12",
   training_frame = train_h2o,
   nfolds = 5,
   hyper_params = drf_params_1,
@@ -41,7 +40,7 @@ drf_grid <- h2o.grid(
   seed = 1
 )
 
-h2o.saveGrid("models", "drf_grid_11")
+h2o.saveGrid("models", "drf_grid_12")
 
 message("Saved model")
 toc()

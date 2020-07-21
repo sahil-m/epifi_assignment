@@ -4,7 +4,6 @@ source("utils.R")
 message("--------------------------")
 message("Starting execution...")
 
-h2o.shutdown(prompt = F)
 h2o.init()
 
 load("data_intermediate/splitted_data.RData")
