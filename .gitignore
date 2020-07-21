@@ -1,0 +1,7 @@
+data/
+data_intermediate/
+data_output/
+models/
+*.pdf
+.Rhistory
+.Rproj.user

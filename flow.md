@@ -1,0 +1,18 @@
+- Manually removed spaces from numeric data file to make it easy to read 
+- Use the file with both numeric and categorical features
+- Strategies when False Positives are more expensive than False Negatives 
+  - via cost function
+    - Change the function itself
+      - the main function
+      - penalty component
+    - Change function parameters
+      - More weight to observation with positive class
+        - oversample positive class
+          - synthetic sample generation (like SMOTE)
+          - give more weights
+        - undersample sample negative class
+  - via optimizing thresholds used to turn output probabilities into class labels - valid only for models which
+- Models
+  - Logistic
+  - SVM
+  - Boosted trees
