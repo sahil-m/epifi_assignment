@@ -44,7 +44,7 @@ source("utils.R")
 
 
 # EDA
-Note: I have only done the EDA to answer the asked questions. I have not done any EDA for the purpose of feature engineering or feature selection.  
+Note: I have only done the EDA to answer the asked questions and to explore simple bivariate predictor-target relationships. I have not done any EDA for the purpose of feature engineering or feature selection.  
 
 ```{r, include=FALSE}
 load("data_intermediate/data_cleaning_1_output.RData")
@@ -88,7 +88,8 @@ ggplotly(
 )
 ```
 
-The distributions are quite overlapping. But there are more young in "Bad" compared to "Good", and that is also visible in the difference in means. 
+The distributions are quite overlapping. But there are more young in "Bad" compared to "Good", and that is also visible in the difference in means.  
+
 > So, young people seem slightly less credit worthy.
 
 But let's break the age into groups to see finer details
@@ -106,6 +107,11 @@ ggplotly(
 ```
 
 > "Bad" is quite low for the (34, 39] age group
+
+```{r, include=FALSE}
+load("data_intermediate/data_cleaning_1_output.RData")
+```
+
 
 ## Credit Accounts
 > Q. Would a person with more credit accounts, be more credit worthy?
@@ -131,10 +137,80 @@ ggplotly(
 
 > Data is too unreliable to say anything on the relationship between no. of credit accounts and credit worthiness
 
+## Other continuous features
+I will define continuous as any faeture having more than 10 unique values. This definition suits the visualization purpose.
+
+```{r, include=FALSE}
+target <- "is_credit_worthy"
+
+features_already_covered = c("credit_history", "age", "count_existing_credits")
+
+cont_columns <- colnames(data_mix)[sapply(data_mix, function(x) n_distinct(x, na.rm = T) > 10)]
+cont_columns_left <- setdiff(cont_columns, features_already_covered)
+```
+
+
+```{r, include=FALSE}
+plot_list = list()
+for (i in 1:length(cont_columns_left)) {
+  cont_column = cont_columns_left[i]
+  
+  plot_list_forContVar <- plot_target_cat_feature_cont(data_mix, cont_column, target)
+  
+  plot_list[[i]] = plot_list_forContVar[[1]]
+}
+```
+
+### Target vs Continuous Features  {.tabset}
+```{r, results='asis', echo = FALSE}
+for (i in 1:length(plot_list)) {
+  cat("#### ", cont_columns_left[i], "\n")
+  print(plot_list[[i]])
+  cat('\n\n')
+}
+```
+
+###
+So, "duration_in_months" seems important, "credit_amount" not
+
+
+## Other categorical features
+```{r, include=FALSE}
+cat_columns <- colnames(data_mix)[sapply(data_mix, function(x) n_distinct(x, na.rm = T) <= 10)]
+cat_columns_left <- setdiff(cat_columns, c(features_already_covered, target))
+```
+
+
+```{r, include=FALSE}
+plot_list = list()
+for (i in 1:length(cat_columns_left)) {
+  cat_column = cat_columns_left[i]
+  
+  plot_list_forCatVar <- plot_target_cat_feature_cat(data_mix, cat_column, target, "Good", "Bad")
+  
+  plot_list[[i]] = plot_list_forCatVar[[1]]
+}
+```
+
+### Target vs Categorical Features  {.tabset}
+```{r, results='asis', echo = FALSE}
+for (i in 1:length(plot_list)) {
+  cat("#### ", cat_columns_left[i], "\n")
+  print(plot_list[[i]])
+  cat('\n\n')
+}
+```
+
+###
+- Cat. features which seem definitely important: "checking_account_status", "purpose", "present_employment_since", "asset_type", "other_installment_plans", "housing_type"  
+- Cat. features where there is high uncertainity: "savings_account_status", "installment_as_percent_of_income", "is_foreign_worker"  
+- Cat. features which don't: "marital_sex_type", "role_in_other_credits", "present_resident_since", "employment_type", "count_dependents", "has_telephone"  
+
+
 # Feature Engineering & Selection  
 As mentioned earlier I didn't do any EDA from featre engineering perspective. So, there is no feature engineering.  
 
-For feature selection I have used Boruta, which I have found to be the best feature selection technique almost always. Below is how the Boruta plot looks like:
+For feature selection too I have not relied on my EDA because bivaraite analysis is not enough to figure out important features. There are better automated techniques. I have used Boruta, which I have found to be the best feature selection technique almost always. Below is how the Boruta plot looks like:  
 ```{r}
 load("models/boruta_train_obj.RData")
 
@@ -147,12 +223,18 @@ axis(side = 1,las=2,labels = names(Labels),
      at = 1:ncol(boruta_train_obj$ImpHistory), cex.axis = 0.7)
 ```
 
-Selected features are:
+Selected features are:  
 ```{r}
 load("data_intermediate/data_after_fs.RData")
-colnames(data_after_fs)
+setdiff(colnames(data_after_fs), target)
 ```
 
+Features removed are:
+```{r}
+setdiff(colnames(data_mix), colnames(data_after_fs))
+```
+
+**This perfectly matches with our EDA too**  
 
 # Modeling
 ## Strategy
@@ -242,6 +324,8 @@ message("Baseline Test Cost: ", baseline_test_cost, "\nBaseline Test Precision: 
 
 
 ## Logistic Regression
+I have just trained a simple Logistic Regressison without any regularization, class weighing, or hyperparameter tuning. This is supposed to be a ML model baseline.
+
 ```{r, include=FALSE}
 h2o.init()
 
@@ -271,8 +355,14 @@ Train Results:
 train_results_glm$results
 ```
 
+Test Results:  
+```{r}
+test_results_glm$results
+```
 
 ## Boosted Trees - GBM
+Here, I have weighed the classes to favour "Good". Weight has been found by tuning via grid search using 5-fold cross validation. I have not tuned other hyperparameters.  
+
 ```{r, include=FALSE}
 model_gbm_best <- h2o.loadModel("models/gbm_grid_11_model_3")
 ```
@@ -292,7 +382,15 @@ Train Results:
 train_results_gbm$results
 ```
 
+Test Results:  
+```{r}
+test_results_gbm$results
+```
+
+
 ## Random Forest
+Here, I have tuned other hyperparameters via random search using 5-fold cross validation. I have not done class weighing here.  
+
 ```{r, include=FALSE}
 h2o.loadGrid(
   "models/drf_grid_11"
@@ -323,6 +421,11 @@ test_results_drf <- get_results(test_pred_df_drf_base, costs)
 Train Results:  
 ```{r}
 train_results_drf$results
+```
+
+Test Results:  
+```{r}
+test_results_drf$results
 ```
 
 ## Comparison

@@ -5,3 +5,4 @@ models/
 *.pdf
 .Rhistory
 .Rproj.user
+.ipynb_checkpoints/
